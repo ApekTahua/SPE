@@ -3,9 +3,9 @@
 void ultrasonic()
 {
     digitalWrite(TRIG_PIN, LOW);
-    delayMicroseconds(2);
+    delayMicroseconds(10);
     digitalWrite(TRIG_PIN, HIGH);
-    delayMicroseconds(2);
+    delayMicroseconds(10);
     digitalWrite(TRIG_PIN, LOW);
 
     duration = pulseIn(ECHO_PIN, HIGH);
@@ -20,149 +20,118 @@ void Open_Bin()
     {
         servo.write(180);
     }
-
-    for (int i = 180; i >= 0; i--)
+    else
     {
-        servo.write(i);
-        delay(3);
+        servo.write(0);
     }
 }
 
 void Seven_Segment()
 {
-    int k;
-    uint8_t data[] = {0xff, 0xff, 0xff, 0xff};
-    uint8_t blank[] = {0x00, 0x00, 0x00, 0x00};
-    display.setBrightness(0x0f);
-
-    // All segments on
-    display.setSegments(data);
-    delay(TEST_DELAY);
-
-    // Selectively set different digits
-    data[0] = display.encodeDigit(0);
-    data[1] = display.encodeDigit(1);
-    data[2] = display.encodeDigit(2);
-    data[3] = display.encodeDigit(3);
-    display.setSegments(data);
-    delay(TEST_DELAY);
-
-    /*
-    for(k = 3; k >= 0; k--) {
-    display.setSegments(data, 1, k);
-    delay(TEST_DELAY);
-    }
-    */
-
-    display.clear();
-    display.setSegments(data + 2, 2, 2);
-    delay(TEST_DELAY);
-
-    display.clear();
-    display.setSegments(data + 2, 2, 1);
-    delay(TEST_DELAY);
-
-    display.clear();
-    display.setSegments(data + 1, 3, 1);
-    delay(TEST_DELAY);
-
-    // Show decimal numbers with/without leading zeros
-    display.showNumberDec(0, false); // Expect: ___0
-    delay(TEST_DELAY);
-    display.showNumberDec(0, true); // Expect: 0000
-    delay(TEST_DELAY);
-    display.showNumberDec(1, false); // Expect: ___1
-    delay(TEST_DELAY);
-    display.showNumberDec(1, true); // Expect: 0001
-    delay(TEST_DELAY);
-    display.showNumberDec(301, false); // Expect: _301
-    delay(TEST_DELAY);
-    display.showNumberDec(301, true); // Expect: 0301
-    delay(TEST_DELAY);
-    display.clear();
-    display.showNumberDec(14, false, 2, 1); // Expect: _14_
-    delay(TEST_DELAY);
-    display.clear();
-    display.showNumberDec(4, true, 2, 2); // Expect: __04
-    delay(TEST_DELAY);
-    display.showNumberDec(-1, false); // Expect: __-1
-    delay(TEST_DELAY);
-    display.showNumberDec(-12); // Expect: _-12
-    delay(TEST_DELAY);
-    display.showNumberDec(-999); // Expect: -999
-    delay(TEST_DELAY);
-    display.clear();
-
-    // Brightness Test
-    for (k = 0; k < 4; k++)
-        data[k] = 0xff;
-    for (k = 0; k < 7; k++)
+    ultrasonic();
+    if (!isnan(weight) && !isnan(percentage))
     {
-        display.setBrightness(k);
-        display.setSegments(data);
-        delay(TEST_DELAY);
-    }
-}
+        w_MSD = int(kg) / 10;
+        w_CSD = int(kg) % 10;
+        w_XSD = (kg - int(kg)) * 10;
+        w_LSD = int(kg * 100) % 10;
 
-void GPS()
-{
-    if (Serial2.available() > 0)
-    {
-        if (gps.encode(Serial2.read()))
-        {
-            if (gps.location.isValid())
-            {
-                Serial.print("Latitude: ");
-                Serial.println(gps.location.lat(), 6);
-                Serial.print("Longitude: ");
-                Serial.println(gps.location.lng(), 6);
-            }
-        }
-    }
-    if (millis() > 5000 && gps.charsProcessed() < 10)
-    {
-        Serial.println(F("No GPS detected: check wiring."));
-        while (true)
-            ;
-    }
-}
+        disp.Number(8, w_MSD);
+        disp.Numberdp(7, w_CSD);
+        disp.Number(6, w_XSD);
+        disp.Number(5, w_LSD);
 
-void Print_Status()
-{
-    weight = scale.get_units();
+        per_MSD = int(percentage) / 10;
+        per_LSD = int(percentage) % 10;
 
-    // float lastReading;
-
-    if (scale.is_ready())
-    {
-        Serial.print("Weight: ");
-        Serial.print(weight);
-        Serial.println(" g");
-
-        Serial.print("Distance Ultra: ");
-        Serial.print(jarak);
-        Serial.println(" cm");
-
-        Serial.print("Percentage: ");
-        Serial.print(percentage);
-        Serial.println(" %");
-
-        GPS();
+        disp.Number(3, per_MSD);
+        disp.Number(2, per_LSD); // Show the percentage with one decimal place
     }
     else
     {
-        Serial.println("HX711 Hilang WOEEEEE ILANGGG");
+        disp.Clear();
     }
-    scale.power_down(); // put the ADC in sleep mode
-    delay(100);
-    scale.power_up();
+}
+// }
+
+void GPS()
+{
+    if (ss.available() > 0)
+    {
+        gps.encode(ss.read());
+        if (gps.location.isValid())
+        {
+            latitude = (gps.location.lat());
+            longitude = (gps.location.lng());
+        }
+        else
+        {
+            latitude = 0.0;
+            longitude = 0.0;
+        }
+    }
+    else
+    {
+        Serial.println("GPS Not Available");
+    }
+}
+
+void printStatus()
+{
+    delay(5000);
+    weight = scale.get_units();
+    kg = weight / 1000;
+    Serial.print("Weight: ");
+    Serial.print(weight);
+    Serial.println(" g");
+
+    Serial.print("Weight: ");
+    Serial.print(kg);
+    Serial.println(" kg");
+
+    Serial.print("Percentage: ");
+    Serial.print(percentage);
+    Serial.println(" %");
+
+    Serial.print("Distance: ");
+    Serial.print(jarak);
+    Serial.println(" cm");
+
+    Serial.print("Latitude: ");
+    Serial.println(latitude, 6);
+    Serial.print("Longitude: ");
+    Serial.println(longitude, 6);
 
     Serial.println();
+}
+
+void taskGetSensorReading(void *parameter)
+{
+    while (1)
+    {
+        ultrasonic();
+        GPS();
+        printStatus();
+        vTaskDelay(pdMS_TO_TICKS(3000));
+    }
+}
+
+void taskShowSegment(void *parameter)
+{
+    while (1)
+    {
+        Seven_Segment();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 
 void setup()
 {
     Serial.begin(115200);
+
+    // //Relay
+    // pinMode(RELAY, OUTPUT);
+    // digitalWrite(RELAY, HIGH);
 
     // UltraSonic
     pinMode(TRIG_PIN, OUTPUT);
@@ -178,17 +147,20 @@ void setup()
 
     // HX711
     scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-    scale.set_scale();
+    scale.set_scale(18.51);
     scale.tare();
+    disp.Initialize(8);
+    disp.Clear();
+    Serial.println("Setup done");
 
-    // GPS
-    Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
+    // // GPS
+    // Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
+
+    xTaskCreate(taskGetSensorReading, "Serial", configMINIMAL_STACK_SIZE + 10240, NULL, 5, NULL);
+    xTaskCreate(taskShowSegment, "Segment", configMINIMAL_STACK_SIZE + 10240, NULL, 5, NULL);
 }
 
 void loop()
 {
-    ultrasonic();
-    Seven_Segment();
-    Print_Status();
-    delay(1000);
+    Open_Bin();
 }
