@@ -28,7 +28,6 @@ void Open_Bin()
 
 void Seven_Segment()
 {
-    ultrasonic();
     if (!isnan(weight) && !isnan(percentage))
     {
         w_MSD = int(kg) / 10;
@@ -52,7 +51,6 @@ void Seven_Segment()
         disp.Clear();
     }
 }
-// }
 
 void GPS()
 {
@@ -61,8 +59,8 @@ void GPS()
         gps.encode(ss.read());
         if (gps.location.isValid())
         {
-            latitude = (gps.location.lat());
-            longitude = (gps.location.lng());
+            latitude = gps.location.lat();
+            longitude = gps.location.lng();
         }
         else
         {
@@ -78,9 +76,9 @@ void GPS()
 
 void printStatus()
 {
-    delay(5000);
     weight = scale.get_units();
     kg = weight / 1000;
+
     Serial.print("Weight: ");
     Serial.print(weight);
     Serial.println(" g");
@@ -111,8 +109,7 @@ void taskGetSensorReading(void *parameter)
     {
         ultrasonic();
         GPS();
-        printStatus();
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -125,13 +122,27 @@ void taskShowSegment(void *parameter)
     }
 }
 
+void taskPrintStatus(void *parameter)
+{
+    while (1)
+    {
+        printStatus();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void taskOpenBin(void *parameter)
+{
+    while (1)
+    {
+        Open_Bin();
+        vTaskDelay(pdMS_TO_TICKS(100)); // Adjust the delay as needed
+    }
+}
+
 void setup()
 {
     Serial.begin(115200);
-
-    // //Relay
-    // pinMode(RELAY, OUTPUT);
-    // digitalWrite(RELAY, HIGH);
 
     // UltraSonic
     pinMode(TRIG_PIN, OUTPUT);
@@ -153,14 +164,13 @@ void setup()
     disp.Clear();
     Serial.println("Setup done");
 
-    // // GPS
-    // Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX, GPS_TX);
-
-    xTaskCreate(taskGetSensorReading, "Serial", configMINIMAL_STACK_SIZE + 10240, NULL, 5, NULL);
-    xTaskCreate(taskShowSegment, "Segment", configMINIMAL_STACK_SIZE + 10240, NULL, 5, NULL);
+    xTaskCreate(taskOpenBin, "OpenBin", configMINIMAL_STACK_SIZE + 10240, NULL, 4, NULL);
+    xTaskCreate(taskGetSensorReading, "SensorReading", configMINIMAL_STACK_SIZE + 10240, NULL, 3, NULL);
+    xTaskCreate(taskShowSegment, "ShowSegment", configMINIMAL_STACK_SIZE + 10240, NULL, 2, NULL);
+    xTaskCreate(taskPrintStatus, "PrintStatus", configMINIMAL_STACK_SIZE + 10240, NULL, 1, NULL);
 }
 
 void loop()
 {
-    Open_Bin();
+    // This loop can be empty since tasks are handling the functionality
 }
