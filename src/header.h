@@ -9,6 +9,7 @@
 #include <SoftwareSerial.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
 #include <MAX7219_7Seg_Disp.h>
 // #include <FirebaseESP32.h>
 // #include <NTPClient.h>
@@ -57,3 +58,10 @@ int w_LSD, w_CSD, w_MSD, w_XSD, per_LSD, per_MSD, per_fraction;
 long duration;
 
 HX711 scale;
+
+// Semaphore
+SemaphoreHandle_t ultrasonicSemaphore;
+SemaphoreHandle_t openBinSemaphore;
+SemaphoreHandle_t printStatusSemaphore;
+
+volatile bool updateDisplayFlag;

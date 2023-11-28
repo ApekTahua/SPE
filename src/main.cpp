@@ -2,53 +2,70 @@
 
 void ultrasonic()
 {
-    digitalWrite(TRIG_PIN, LOW);
-    delayMicroseconds(10);
-    digitalWrite(TRIG_PIN, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(TRIG_PIN, LOW);
+    if (xSemaphoreTake(ultrasonicSemaphore, portMAX_DELAY))
+    {
+        digitalWrite(TRIG_PIN, LOW);
+        delayMicroseconds(10);
+        digitalWrite(TRIG_PIN, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(TRIG_PIN, LOW);
 
-    duration = pulseIn(ECHO_PIN, HIGH);
-    jarak = duration * SOUND_SPEED / 2;
+        duration = pulseIn(ECHO_PIN, HIGH);
+        jarak = duration * SOUND_SPEED / 2;
 
-    percentage = (height - jarak) * 100 / height;
+        percentage = (height - jarak) * 100 / height;
+
+        xSemaphoreGive(ultrasonicSemaphore);
+    }
 }
 
 void Open_Bin()
 {
-    if (digitalRead(IR_PIN) == HIGH)
+    if (xSemaphoreTake(openBinSemaphore, portMAX_DELAY))
     {
-        servo.write(180);
-    }
-    else
-    {
-        servo.write(0);
+        if (digitalRead(IR_PIN) == HIGH)
+        {
+            servo.write(180);
+            updateDisplayFlag = true;
+        }
+        else
+        {
+            servo.write(0);
+            updateDisplayFlag = true;
+        }
+
+        xSemaphoreGive(openBinSemaphore);
     }
 }
 
 void Seven_Segment()
 {
-    if (!isnan(weight) && !isnan(percentage))
+    if (updateDisplayFlag)
     {
-        w_MSD = int(kg) / 10;
-        w_CSD = int(kg) % 10;
-        w_XSD = (kg - int(kg)) * 10;
-        w_LSD = int(kg * 100) % 10;
+        if (!isnan(weight) && !isnan(percentage))
+        {
+            int w_MSD = int(kg) / 10;
+            int w_CSD = int(kg) % 10;
+            int w_XSD = (kg - int(kg)) * 10;
+            int w_LSD = int(kg * 100) % 10;
 
-        disp.Number(8, w_MSD);
-        disp.Numberdp(7, w_CSD);
-        disp.Number(6, w_XSD);
-        disp.Number(5, w_LSD);
+            disp.Number(8, w_MSD);
+            disp.Numberdp(7, w_CSD);
+            disp.Number(6, w_XSD);
+            disp.Number(5, w_LSD);
 
-        per_MSD = int(percentage) / 10;
-        per_LSD = int(percentage) % 10;
+            int per_MSD = int(percentage) / 10;
+            int per_LSD = int(percentage) % 10;
 
-        disp.Number(3, per_MSD);
-        disp.Number(2, per_LSD); // Show the percentage with one decimal place
-    }
-    else
-    {
-        disp.Clear();
+            disp.Number(3, per_MSD);
+            disp.Number(2, per_LSD);
+
+            updateDisplayFlag = true;
+        }
+        else
+        {
+            disp.Clear();
+        }
     }
 }
 
@@ -76,31 +93,36 @@ void GPS()
 
 void printStatus()
 {
-    weight = scale.get_units();
-    kg = weight / 1000;
+    if (xSemaphoreTake(printStatusSemaphore, portMAX_DELAY))
+    {
+        weight = scale.get_units();
+        kg = weight / 1000;
 
-    Serial.print("Weight: ");
-    Serial.print(weight);
-    Serial.println(" g");
+        Serial.print("Weight: ");
+        Serial.print(weight);
+        Serial.println(" g");
 
-    Serial.print("Weight: ");
-    Serial.print(kg);
-    Serial.println(" kg");
+        Serial.print("Weight: ");
+        Serial.print(kg);
+        Serial.println(" kg");
 
-    Serial.print("Percentage: ");
-    Serial.print(percentage);
-    Serial.println(" %");
+        Serial.print("Percentage: ");
+        Serial.print(percentage);
+        Serial.println(" %");
 
-    Serial.print("Distance: ");
-    Serial.print(jarak);
-    Serial.println(" cm");
+        Serial.print("Distance: ");
+        Serial.print(jarak);
+        Serial.println(" cm");
 
-    Serial.print("Latitude: ");
-    Serial.println(latitude, 6);
-    Serial.print("Longitude: ");
-    Serial.println(longitude, 6);
+        Serial.print("Latitude: ");
+        Serial.println(latitude, 6);
+        Serial.print("Longitude: ");
+        Serial.println(longitude, 6);
 
-    Serial.println();
+        Serial.println();
+
+        xSemaphoreGive(printStatusSemaphore);
+    }
 }
 
 void taskGetSensorReading(void *parameter)
@@ -118,7 +140,6 @@ void taskShowSegment(void *parameter)
     while (1)
     {
         Seven_Segment();
-        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -164,9 +185,13 @@ void setup()
     disp.Clear();
     Serial.println("Setup done");
 
-    xTaskCreate(taskOpenBin, "OpenBin", configMINIMAL_STACK_SIZE + 10240, NULL, 4, NULL);
-    xTaskCreate(taskGetSensorReading, "SensorReading", configMINIMAL_STACK_SIZE + 10240, NULL, 3, NULL);
-    xTaskCreate(taskShowSegment, "ShowSegment", configMINIMAL_STACK_SIZE + 10240, NULL, 2, NULL);
+    ultrasonicSemaphore = xSemaphoreCreateMutex();
+    openBinSemaphore = xSemaphoreCreateMutex();
+    printStatusSemaphore = xSemaphoreCreateMutex();
+
+    xTaskCreate(taskOpenBin, "OpenBin", configMINIMAL_STACK_SIZE + 10240, NULL, 3, NULL);
+    xTaskCreate(taskGetSensorReading, "SensorReading", configMINIMAL_STACK_SIZE + 10240, NULL, 2, NULL);
+    xTaskCreate(taskShowSegment, "ShowSegment", configMINIMAL_STACK_SIZE + 10240, NULL, 4, NULL);
     xTaskCreate(taskPrintStatus, "PrintStatus", configMINIMAL_STACK_SIZE + 10240, NULL, 1, NULL);
 }
 
